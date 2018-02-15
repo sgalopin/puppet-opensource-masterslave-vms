@@ -1,0 +1,166 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure("2") do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  # Every Vagrant development environment requires a box. You can search for
+  # boxes at https://atlas.hashicorp.com/search.
+  # config.vm.box = "debian/contrib-stretch64" # Box with Virtualbox Guest Additions
+  config.vm.box = "debian/stretch64"
+
+  # Disable automatic box update checking. If you disable this, then
+  # boxes will only be checked for updates when the user runs
+  # `vagrant box outdated`. This is not recommended.
+  # config.vm.box_check_update = false
+
+  # Create a forwarded port mapping which allows access to a specific port
+  # within the machine from a port on the host machine. In the example below,
+  # accessing "localhost:8080" will access port 80 on the guest machine.
+  # config.vm.network "forwarded_port", guest: 80, host: 8080
+
+  # Create a private network, which allows host-only access to the machine
+  # using a specific IP.
+  # config.vm.network "private_network", ip: "192.168.33.10"
+  config.vm.network "private_network", ip: "192.168.50.15"
+  config.vm.hostname = "master-pos.example.com"
+
+  # Create a public network, which generally matched to bridged network.
+  # Bridged networks make the machine appear as another physical device on
+  # your network.
+  # config.vm.network "public_network"
+
+  # Share an additional folder to the guest VM. The first argument is
+  # the path on the host to the actual folder. The second argument is
+  # the path on the guest to mount the folder. And the optional third
+  # argument is a set of non-required options.
+  # config.vm.synced_folder "../data", "/vagrant_data"
+
+  # disable the default root
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  # Provider-specific configuration so you can fine-tune various
+  # backing providers for Vagrant. These expose provider-specific options.
+  # Example for VirtualBox:
+  #
+  # config.vm.provider "virtualbox" do |vb|
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "1024"
+  # end
+  #
+  # View the documentation for the provider you are using for more
+  # information on available options.
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 4096
+    v.cpus = 2
+    v.name = "master-pos"
+  end
+
+  # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
+  # such as FTP and Heroku are also available. See the documentation at
+  # https://docs.vagrantup.com/v2/push/atlas.html for more information.
+  # config.push.define "atlas" do |push|
+  #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
+  # end
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  # config.vm.provision "shell", inline: <<-SHELL
+  #   apt-get update
+  #   apt-get install -y apache2
+  # SHELL
+  config.vm.provision "file", source: "./id_rsa", destination: "/var/tmp/id_rsa"
+  config.vm.provision "file", source: "../puppet/environments/production/Puppetfile", destination: "/var/tmp/Puppetfile"
+  config.vm.provision "file", source: "../puppet/environments/production/manifests/master-pos.example.com.pp", destination: "/var/tmp/master-pos.example.com.pp"
+  config.vm.provision "file", source: "../puppet/environments/production/manifests/agent-pos.example.com.pp", destination: "/var/tmp/agent-pos.example.com.pp"
+  config.vm.provision "shell", privileged: true, inline: <<-SHELL
+	
+	# Puppet Open-Source (For URL, see https://puppet.com/download-open-source-puppet/thank-you)
+	# Debian 9 Stretch
+	wget -r -O /var/tmp/puppet5-release-stretch.deb https://apt.puppetlabs.com/puppet5-release-stretch.deb
+	dpkg -i /var/tmp/puppet5-release-stretch.deb
+
+    # Packages update and upgrade
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+
+	# Puppet server and git install
+	apt-get install -y puppetserver git-core
+	export PATH=/opt/puppetlabs/bin:$PATH
+	service puppetserver start
+	#sed -i 's|JAVA_ARGS="-Xms2g -Xmx2g"|JAVA_ARGS="-Xms512m -Xmx512m"' /etc/default/puppetserver
+
+	# ssh configuration
+	mkdir /root/.ssh
+	mv /var/tmp/id_rsa /root/.ssh/id_rsa
+	chown root:root /root/.ssh/id_rsa
+	chmod 400 /root/.ssh/id_rsa
+	# ssh-keyscan -t rsa -p 10022 gitlab.dockerforge.ign.fr >> ~/.ssh/known_hosts
+	echo "[gitlab.dockerforge.ign.fr]:10022 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDlKekDJ9c6KwhDz75YMoVBZPTiywdIe8r/hl1CLAl8D6IMHSjROdGQ1kGjOP+S5ySLNqQ2sWJFcsMdzy99CFP1qVR5m8l5VKLi6wL7zii4QcfiqhXPq4GqPjyIatzVyW5r6wL6MfDtgMo7bVXrlsGYmcSfhiPc6aVCRGtNpUdM4pUIK7Wrk88gjH2GXNeBTCTYndTZNmDjBGG9idMgv7tmjb5FWJi88LDFfqE8gHfOqd74Qc9IATrikmgtOcGOLt17cI9R/bHjcmNS6ySCKqFryPhPgYysWS3MyERWPfBSLXvyp0vIcCnu/mD75eXy9uRMauZU3sJ4M34ilyaN29aZ" >> ~/.ssh/known_hosts
+	
+	# r10k install
+	# https://github.com/puppetlabs/r10k/blob/master/doc/dynamic-environments/configuration.mkd
+	/opt/puppetlabs/puppet/bin/gem install r10k
+	
+	# Puppetfile install
+	mv /var/tmp/Puppetfile /etc/puppetlabs/code/environments/production/Puppetfile
+	chown root:root /etc/puppetlabs/code/environments/production/Puppetfile
+	/opt/puppetlabs/puppet/bin/r10k puppetfile install \
+	--puppetfile /etc/puppetlabs/code/environments/production/Puppetfile \
+	--moduledir /etc/puppetlabs/code/environments/production/modules
+	
+	# Puppet apply (installing the puppetDB module locally)
+	mv /var/tmp/master-pos.example.com.pp /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
+	chown root:root /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
+	mv /var/tmp/agent-pos.example.com.pp /etc/puppetlabs/code/environments/production/manifests/agent-pos.example.com.pp
+	chown root:root /etc/puppetlabs/code/environments/production/manifests/agent-pos.example.com.pp
+	apt-get install apt-transport-https # required per the puppet apply
+	puppet apply /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
+	
+  SHELL
+
+  config.vm.post_up_message = "Your master is ready. You can vagrant up the agent."
+
+  # The following provisions are only run when called explicitly
+  if ARGV.include? '--provision-with'
+
+    # Provision "sign-cert"
+    config.vm.provision "sign-cert", type: "shell", privileged: false, inline: <<-SHELL
+      sudo puppet cert sign --all
+    SHELL
+
+    # Provision "clean-agent-cert"
+    # See https://puppet.com/docs/pe/2017.3/ssl_and_certificates/regenerate_puppet_agent_certificates.html
+    config.vm.provision "clean-agent-cert", type: "shell", privileged: true, inline: <<-SHELL
+      puppet cert clean agent-pos.example.com
+    SHELL
+
+    # Provision "clean-master-cert"
+    # See https://puppet.com/docs/pe/2017.3/ssl_and_certificates/regenerating_certificates_monolithic_installs.html
+    config.vm.provision "clean-master-cert", type: "shell", privileged: true, inline: <<-SHELL
+      # Back up the directory
+      DATE=$(date +"%d-%b-%Y")
+      cd /etc/puppetlabs/puppet
+      tar -zcvf ssl-$DATE.tgz ssl
+      # (Optional) Delete and recreate the Puppet CA
+        # rm -rf /etc/puppetlabs/puppet/ssl/*
+        # puppet cert list -a
+      # Regenerate the Puppet master certificates
+      rm -f /opt/puppetlabs/puppet/cache/client_data/catalog/master-pos.example.com.json
+      puppet cert clean master-pos.example.com
+      puppet infrastructure configure --no-recover
+    SHELL
+
+  end
+
+end

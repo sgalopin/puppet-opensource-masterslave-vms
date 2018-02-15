@@ -1,0 +1,130 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure("2") do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  # Every Vagrant development environment requires a box. You can search for
+  # boxes at https://atlas.hashicorp.com/search.
+  # config.vm.box = "debian/contrib-stretch64" # Box with Virtualbox Guest Additions
+  config.vm.box = "debian/stretch64"
+
+  # Disable automatic box update checking. If you disable this, then
+  # boxes will only be checked for updates when the user runs
+  # `vagrant box outdated`. This is not recommended.
+  # config.vm.box_check_update = false
+
+  # Create a forwarded port mapping which allows access to a specific port
+  # within the machine from a port on the host machine. In the example below,
+  # accessing "localhost:8080" will access port 80 on the guest machine.
+  # config.vm.network "forwarded_port", guest: 80, host: 8080
+
+  # Create a private network, which allows host-only access to the machine
+  # using a specific IP.
+  # config.vm.network "private_network", ip: "192.168.33.10"
+  config.vm.network "private_network", ip: "192.168.50.16"
+  config.vm.hostname = "agent-pos.example.com"
+
+  # Create a public network, which generally matched to bridged network.
+  # Bridged networks make the machine appear as another physical device on
+  # your network.
+  # config.vm.network "public_network"
+
+  # Share an additional folder to the guest VM. The first argument is
+  # the path on the host to the actual folder. The second argument is
+  # the path on the guest to mount the folder. And the optional third
+  # argument is a set of non-required options.
+  # config.vm.synced_folder "../data", "/vagrant_data"
+
+  # disable the default root
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  # Provider-specific configuration so you can fine-tune various
+  # backing providers for Vagrant. These expose provider-specific options.
+  # Example for VirtualBox:
+  #
+  # config.vm.provider "virtualbox" do |vb|
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "1024"
+  # end
+  #
+  # View the documentation for the provider you are using for more
+  # information on available options.
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 4096
+    v.cpus = 2
+    v.name = "agent-pos"
+  end
+
+  # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
+  # such as FTP and Heroku are also available. See the documentation at
+  # https://docs.vagrantup.com/v2/push/atlas.html for more information.
+  # config.push.define "atlas" do |push|
+  #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
+  # end
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  # config.vm.provision "shell", inline: <<-SHELL
+  #   apt-get update
+  #   apt-get install -y apache2
+  # SHELL
+  config.vm.provision "shell", privileged: true, inline: <<-SHELL
+
+	# Puppet Open-Source (For URL, see https://puppet.com/download-open-source-puppet/thank-you)
+	# Debian 9 Stretch
+	wget -r -O /var/tmp/puppet5-release-stretch.deb https://apt.puppetlabs.com/puppet5-release-stretch.deb
+	dpkg -i /var/tmp/puppet5-release-stretch.deb
+
+  # Packages update and upgrade
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+
+	# Puppet agent and git install
+	apt-get install -y puppet-agent git-core
+	export PATH=/opt/puppetlabs/bin:$PATH
+	sed -i '$ a 192.168.50.15 master-pos.example.com' /etc/hosts
+	puppet config set server master-pos.example.com --section agent
+	puppet resource service puppet ensure=running enable=true
+
+  SHELL
+
+  config.vm.post_up_message = "Your agent is ready. You can go to sign the certificate on the master (puppet cert list && puppet cert sign agent-pos.example.com)."
+
+  # The following provisions are only run when called explicitly
+  if ARGV.include? '--provision-with'
+
+  	# Provision "run"
+    config.vm.provision "run", type: "shell", privileged: true, inline: <<-SHELL
+	    puppet agent --test
+    SHELL
+
+    # Provision "clean-cert"
+    # See https://puppet.com/docs/pe/2017.3/ssl_and_certificates/regenerate_puppet_agent_certificates.html
+    config.vm.provision "clean-cert", type: "shell", privileged: true, inline: <<-SHELL
+      # Back up the directory
+      DATE=$(date +"%d-%b-%Y")
+      cd /etc/puppetlabs/puppet
+      tar -zcvf ssl-$DATE.tgz ssl
+      puppet resource service puppet ensure=stopped
+      puppet resource service mcollective ensure=stopped
+      puppet resource service pxp-agent ensure=stopped
+      rm -rf /etc/puppetlabs/puppet/ssl
+      rm -f /opt/puppetlabs/puppet/cache/client_data/catalog/agent-pos.example.com.json
+      puppet resource service puppet ensure=running
+      puppet resource service mcollective ensure=running
+    SHELL
+
+  end
+
+end
