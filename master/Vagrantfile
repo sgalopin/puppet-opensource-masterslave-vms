@@ -80,53 +80,61 @@ Vagrant.configure("2") do |config|
   #   apt-get install -y apache2
   # SHELL
   config.vm.provision "file", source: "./id_rsa", destination: "/var/tmp/id_rsa"
-  config.vm.provision "file", source: "../puppet/environments/production/Puppetfile", destination: "/var/tmp/Puppetfile"
+  # config.vm.provision "file", source: "../puppet/environments/production/Puppetfile", destination: "/var/tmp/Puppetfile"
+  config.vm.provision "file", source: "./r10k.yaml", destination: "/var/tmp/r10k.yaml"
   config.vm.provision "file", source: "../puppet/environments/production/manifests/master-pos.example.com.pp", destination: "/var/tmp/master-pos.example.com.pp"
   config.vm.provision "file", source: "../puppet/environments/production/manifests/agent-pos.example.com.pp", destination: "/var/tmp/agent-pos.example.com.pp"
   config.vm.provision "shell", privileged: true, inline: <<-SHELL
-	
-	# Puppet Open-Source (For URL, see https://puppet.com/download-open-source-puppet/thank-you)
-	# Debian 9 Stretch
-	wget -r -O /var/tmp/puppet5-release-stretch.deb https://apt.puppetlabs.com/puppet5-release-stretch.deb
-	dpkg -i /var/tmp/puppet5-release-stretch.deb
+
+    # Puppet Open-Source (For URL, see https://puppet.com/download-open-source-puppet/thank-you)
+    # Debian 9 Stretch
+    wget -r -O /var/tmp/puppet5-release-stretch.deb https://apt.puppetlabs.com/puppet5-release-stretch.deb
+    dpkg -i /var/tmp/puppet5-release-stretch.deb
 
     # Packages update and upgrade
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
 
-	# Puppet server and git install
-	apt-get install -y puppetserver git-core
-	export PATH=/opt/puppetlabs/bin:$PATH
-	service puppetserver start
-	#sed -i 's|JAVA_ARGS="-Xms2g -Xmx2g"|JAVA_ARGS="-Xms512m -Xmx512m"' /etc/default/puppetserver
+    # Puppet server and git install
+    apt-get install -y puppetserver git-core
+    export PATH=/opt/puppetlabs/bin:$PATH
+    service puppetserver start
+    #sed -i 's|JAVA_ARGS="-Xms2g -Xmx2g"|JAVA_ARGS="-Xms512m -Xmx512m"' /etc/default/puppetserver
 
-	# ssh configuration
-	mkdir /root/.ssh
-	mv /var/tmp/id_rsa /root/.ssh/id_rsa
-	chown root:root /root/.ssh/id_rsa
-	chmod 400 /root/.ssh/id_rsa
-	# ssh-keyscan -t rsa -p 10022 gitlab.dockerforge.ign.fr >> ~/.ssh/known_hosts
-	echo "[gitlab.dockerforge.ign.fr]:10022 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDlKekDJ9c6KwhDz75YMoVBZPTiywdIe8r/hl1CLAl8D6IMHSjROdGQ1kGjOP+S5ySLNqQ2sWJFcsMdzy99CFP1qVR5m8l5VKLi6wL7zii4QcfiqhXPq4GqPjyIatzVyW5r6wL6MfDtgMo7bVXrlsGYmcSfhiPc6aVCRGtNpUdM4pUIK7Wrk88gjH2GXNeBTCTYndTZNmDjBGG9idMgv7tmjb5FWJi88LDFfqE8gHfOqd74Qc9IATrikmgtOcGOLt17cI9R/bHjcmNS6ySCKqFryPhPgYysWS3MyERWPfBSLXvyp0vIcCnu/mD75eXy9uRMauZU3sJ4M34ilyaN29aZ" >> ~/.ssh/known_hosts
-	
-	# r10k install
-	# https://github.com/puppetlabs/r10k/blob/master/doc/dynamic-environments/configuration.mkd
-	/opt/puppetlabs/puppet/bin/gem install r10k
-	
-	# Puppetfile install
-	mv /var/tmp/Puppetfile /etc/puppetlabs/code/environments/production/Puppetfile
-	chown root:root /etc/puppetlabs/code/environments/production/Puppetfile
-	/opt/puppetlabs/puppet/bin/r10k puppetfile install \
-	--puppetfile /etc/puppetlabs/code/environments/production/Puppetfile \
-	--moduledir /etc/puppetlabs/code/environments/production/modules
-	
-	# Puppet apply (installing the puppetDB module locally)
-	mv /var/tmp/master-pos.example.com.pp /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
-	chown root:root /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
-	mv /var/tmp/agent-pos.example.com.pp /etc/puppetlabs/code/environments/production/manifests/agent-pos.example.com.pp
-	chown root:root /etc/puppetlabs/code/environments/production/manifests/agent-pos.example.com.pp
-	apt-get install apt-transport-https # required per the puppet apply
-	puppet apply /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
-	
+    # ssh configuration
+    mkdir /root/.ssh
+    mv /var/tmp/id_rsa /root/.ssh/id_rsa
+    chown root:root /root/.ssh/id_rsa
+    chmod 400 /root/.ssh/id_rsa
+    # ssh-keyscan -t rsa -p 10022 gitlab.dockerforge.ign.fr >> ~/.ssh/known_hosts
+    echo "[gitlab.dockerforge.ign.fr]:10022 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDlKekDJ9c6KwhDz75YMoVBZPTiywdIe8r/hl1CLAl8D6IMHSjROdGQ1kGjOP+S5ySLNqQ2sWJFcsMdzy99CFP1qVR5m8l5VKLi6wL7zii4QcfiqhXPq4GqPjyIatzVyW5r6wL6MfDtgMo7bVXrlsGYmcSfhiPc6aVCRGtNpUdM4pUIK7Wrk88gjH2GXNeBTCTYndTZNmDjBGG9idMgv7tmjb5FWJi88LDFfqE8gHfOqd74Qc9IATrikmgtOcGOLt17cI9R/bHjcmNS6ySCKqFryPhPgYysWS3MyERWPfBSLXvyp0vIcCnu/mD75eXy9uRMauZU3sJ4M34ilyaN29aZ" >> ~/.ssh/known_hosts
+
+    # r10k install and deploy
+    # https://github.com/puppetlabs/r10k/blob/master/doc/dynamic-environments/configuration.mkd
+    /opt/puppetlabs/puppet/bin/gem install r10k
+    mkdir /etc/puppetlabs/r10k
+    mv /var/tmp/r10k.yaml /etc/puppetlabs/r10k/r10k.yaml
+    chown root:root /etc/puppetlabs/r10k/r10k.yaml
+    /opt/puppetlabs/puppet/bin/r10k deploy environment -p
+
+    # Exemple with a local Puppetfile install:
+    # mv /var/tmp/Puppetfile /etc/puppetlabs/code/environments/production/Puppetfile
+    # chown root:root /etc/puppetlabs/code/environments/production/Puppetfile
+    # /opt/puppetlabs/puppet/bin/r10k puppetfile install \
+    # --puppetfile /etc/puppetlabs/code/environments/production/Puppetfile \
+    # --moduledir /etc/puppetlabs/code/environments/production/modules
+
+    # Puppet apply (installing the puppetDB module locally)
+    puppet module install puppetlabs-puppetdb --version 6.0.2 --target-dir /etc/puppetlabs/code/environments/production/modules
+    mv /var/tmp/master-pos.example.com.pp /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
+    chown root:root /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
+    apt-get install apt-transport-https # required per the puppet apply
+    puppet apply /etc/puppetlabs/code/environments/production/manifests/master-pos.example.com.pp
+
+    # Addition of the agent-pos.example.com.pp file
+    mv /var/tmp/agent-pos.example.com.pp /etc/puppetlabs/code/environments/production/manifests/agent-pos.example.com.pp
+    chown root:root /etc/puppetlabs/code/environments/production/manifests/agent-pos.example.com.pp
+
   SHELL
 
   config.vm.post_up_message = "Your master is ready. You can vagrant up the agent."
@@ -159,6 +167,11 @@ Vagrant.configure("2") do |config|
       rm -f /opt/puppetlabs/puppet/cache/client_data/catalog/master-pos.example.com.json
       puppet cert clean master-pos.example.com
       puppet infrastructure configure --no-recover
+    SHELL
+
+    # Provision "deploy-environments"
+    config.vm.provision "deploy-environments", type: "shell", privileged: true, inline: <<-SHELL
+      /opt/puppetlabs/puppet/bin/r10k deploy environment -p
     SHELL
 
   end

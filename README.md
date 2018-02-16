@@ -23,7 +23,7 @@ Se placer dans le répertoire dans lequel vous avez installé le projet:
 - Taper la commande 'cd master && vagrant up' (Lance la VM maître),
 - Taper la commande 'cd ../agent && vagrant up' (Lance la VM esclave),
 - Taper la commande 'cd ../master && vagrant provision --provision-with sign-node-requests' (Signe les certificats),
-- Taper la commande 'cd ../agent && vagrant provision --provision-with run' (Installe l'application).
+- Taper la commande 'cd ../agent && vagrant provision --provision-with run-prod' (Installe l'application de production).
 
 ### Documentation Puppet utile
 
@@ -67,10 +67,12 @@ Se placer dans le répertoire dans lequel vous avez installé le projet:
   - **$ vagrant provision --provision-with sign-node-requests**: Signe les certificats des agents (VMs esclaves).
   - **$ vagrant provision --provision-with clean-master-cert**: Supprime les certificats du maître et les recrée.
   - **$ vagrant provision --provision-with clean-agent-cert**: Supprime les certificats de l'agent en local et les recrée.
+  - **$ vagrant provision --provision-with deploy-environments**: Déploie les environnements de code Puppet.
 
 
 - Sur la VM esclave (agent):
-  - **$ vagrant provision --provision-with run**: Installe l'application (Lance un unique run verbeux).
+  - **$ vagrant provision --provision-with run-prod**: Installe l'application de production (Lance un unique run verbeux).
+  - **$ vagrant provision --provision-with run-dev**: Installe l'application de développement (Lance un unique run verbeux).
   - **$ vagrant provision --provision-with clean-agent-cert**: Supprime les certificats et refait une demande au master.
 
 ### Commande Puppet
