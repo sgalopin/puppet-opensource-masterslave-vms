@@ -1,4 +1,4 @@
-# Puppet open source en architecture maître/esclave avec Puppetfile (r10k)
+# Puppet open source en architecture maître/esclave avec dépôt de contrôle (r10k)
 Création et configuration de machines virtuelles (maître/esclave) pour tester la version open source de Puppet.
 
 ## Installation
